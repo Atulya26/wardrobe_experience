@@ -1,0 +1,11 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { initial, transition } from '../src/journeys/flow2/model.ts'
+const run=(...events)=>events.reduce((s,e)=>transition(s,typeof e==='string'?{type:e}:e),initial)
+test('accept adjustment, save, quiet return retains outfit',()=>{const s=run('ATTEND','SCAN_DONE','ADVICE','ACCEPT','ADJUSTED','SAVE','CONTINUE','RESUME');assert.equal(s.phase,'confirmed');assert.equal(s.adjusted,true);assert.equal(s.saved,true)})
+test('decline keeps original sleeves and supports closure',()=>{const s=run('ATTEND','SCAN_DONE','ADVICE','DECLINE','CONTINUE');assert.equal(s.phase,'quiet');assert.equal(s.adjusted,false)})
+test('stale scan and adjustment events cannot overwrite a restarted flow',()=>{const s=run('ATTEND','SCAN_DONE','ADVICE','ACCEPT','RESTART','ADJUSTED','SCAN_DONE');assert.equal(s.phase,'discover');assert.equal(s.adjusted,false)})
+test('compare selects a new stable garment and clears fit-specific changes',()=>{const s=run('ATTEND','SCAN_DONE','ADVICE','ACCEPT','ADJUSTED','SAVE','COMPARE',{type:'CHOOSE',outfit:'denim'});assert.equal(s.phase,'detection');assert.equal(s.outfit,'denim');assert.equal(s.adjusted,false);assert.equal(s.saved,false)})
+test('cancel adjustment is explicit and cannot be completed by a late release',()=>{const s=run('ATTEND','SCAN_DONE','ADVICE','ACCEPT','DECLINE','ADJUSTED');assert.equal(s.phase,'confirmed');assert.equal(s.adjusted,false)})
+test('share preview requires sending before a reply and preserves adjusted outfit',()=>{const s=run('ATTEND','SCAN_DONE','ADVICE','ACCEPT','ADJUSTED','SHARE','REPLY_RECEIVED');assert.equal(s.phase,'share-preview');const reply=transition(transition(s,{type:'SEND_SHARE'}),{type:'REPLY_RECEIVED'});assert.equal(reply.phase,'reply');assert.equal(reply.adjusted,true);assert.equal(transition(reply,{type:'CLOSE_SHARE'}).phase,'confirmed')})
+test('closing or restarting a simulated conversation ignores a late reply',()=>{const s=run('ATTEND','SCAN_DONE','ADVICE','DECLINE','SHARE','SEND_SHARE','CLOSE_SHARE','REPLY_RECEIVED');assert.equal(s.phase,'confirmed');const reset=run('ATTEND','SCAN_DONE','ADVICE','DECLINE','SHARE','SEND_SHARE','RESTART','REPLY_RECEIVED');assert.equal(reset.phase,'discover')})

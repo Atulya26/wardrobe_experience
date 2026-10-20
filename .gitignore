@@ -1,0 +1,15 @@
+# Generated and local files
+node_modules/
+dist/
+.vercel/
+.vite/
+*.tsbuildinfo
+*.log
+.DS_Store
+.env
+.env.*
+!.env.example
+output/
+.playwright-cli/
+backups/
+.claude/
